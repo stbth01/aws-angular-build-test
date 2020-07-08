@@ -1,0 +1,10 @@
+version: 0.2
+
+phases:
+  build:
+    commands:
+      - echo timestart $CODEBUILD_START_TIME
+      # - npm ci
+      # - npm run lint
+      # - npm run build:ci
+      # - npm run test:ci
