@@ -8,8 +8,8 @@ phases:
       - npm run lint
       - npm run build
       - npm run test:ci
-  artifacts:
-    files:
-      - "**/*"
-    name: dev-$CODEBUILD_BUILD_NUMBER-$(date +%Y-%m-%d)-$CODEBUILD_START_TIME
-    base-directory: dist
+artifacts:
+  files:
+    - "**/*"
+  name: dev-$CODEBUILD_BUILD_NUMBER-$(date +%Y-%m-%d)-$CODEBUILD_START_TIME
+  base-directory: dist
