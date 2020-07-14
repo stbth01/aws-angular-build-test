@@ -1,0 +1,81 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "",
+  "Resources": {
+    "S3ArtifactBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": "artifact-bucket-valhalla-12971829382",
+        "AccessControl": "PublicRead"
+      },
+      "DeletionPolicy": "Delete"
+    },
+    "IAmSpartacus": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": ["codepipeline.amazonaws.com"]
+              },
+              "Action": ["sts:AssumeRole"]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "Effect": "Allow",
+            "Resource": [
+              {
+                "Fn::Join": [
+                  "",
+                  ["arn:aws:s3:::", { "Ref": "S3ArtifactBucket" }, "/*"]
+                ]
+              }
+            ],
+            "Action": ["s3:PutObject", "s3:GetObject"]
+          }
+        ],
+        "RoleName": "MathRole-WhateverIWant",
+        "PermissionsBoundary": "arn:aws:iam::967082312205:policy/Math-Boundary-Policy"
+      }
+    },
+    "codepipeline": {
+      "Type": "AWS::CodePipeline::Pipeline",
+      "Properties": {
+        "ArtifactStore": {
+          "Type": "S3",
+          "Location": { "Ref": "S3ArtifactBucket" }
+        },
+        "DisableInboundStageTransitions": [],
+        "Name": "name",
+        "RestartExecutionOnUpdate": false,
+        "RoleArn": "IAmSpartacus",
+        "Stages": [
+          {
+            "Name": "Source",
+            "Actions": [
+              {
+                "ActionTypeId": {
+                  "Category": "Source",
+                  "Owner": "ThirdParty",
+                  "Version": "1",
+                  "Provider": "GitHub"
+                },
+                "Configuration": { "key": "value" },
+                "InputArtifacts": [],
+                "Name": "actionName",
+                "OutputArtifacts": [],
+                "RoleArn": "",
+                "RunOrder": 1
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
