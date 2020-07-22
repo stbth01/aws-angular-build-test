@@ -10,6 +10,44 @@
       },
       "DeletionPolicy": "Delete"
     },
+    "IAmSpartacusNowForCodeBuild": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": ["codepipeline.amazonaws.com"]
+              },
+              "Action": ["sts:AssumeRole"]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "root",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": {
+                "Effect": "Allow",
+                "Resource": [
+                  {
+                    "Fn::Join": [
+                      "",
+                      ["arn:aws:s3:::valhalla-aws-angular-artifacts/*"]
+                    ]
+                  }
+                ],
+                "Action": ["s3:PutObject", "s3:GetObject"]
+              }
+            }
+          }
+        ],
+        "RoleName": "MathRole-WhateverIWantNowForCodeBuild"
+      }
+    },
     "IAmSpartacus": {
       "Type": "AWS::IAM::Role",
       "Properties": {
@@ -27,20 +65,43 @@
         },
         "Policies": [
           {
-            "Effect": "Allow",
-            "Resource": [
-              {
-                "Fn::Join": [
-                  "",
-                  ["arn:aws:s3:::", { "Ref": "S3ArtifactBucket" }, "/*"]
-                ]
+            "PolicyName": "root",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": {
+                "Effect": "Allow",
+                "Resource": [
+                  {
+                    "Fn::Join": [
+                      "",
+                      ["arn:aws:s3:::", { "Ref": "S3ArtifactBucket" }, "/*"]
+                    ]
+                  }
+                ],
+                "Action": ["s3:PutObject", "s3:GetObject"]
               }
-            ],
-            "Action": ["s3:PutObject", "s3:GetObject"]
+            }
           }
         ],
-        "RoleName": "MathRole-WhateverIWant",
-        "PermissionsBoundary": "arn:aws:iam::967082312205:policy/Math-Boundary-Policy"
+        "RoleName": "MathRole-WhateverIWant"
+      }
+    },
+    "codebuild": {
+      "Type": "AWS::CodeBuild::Project",
+      "Properties": {
+        "Artifacts": {
+          "Type": "S3",
+          "Location": "valhalla-aws-angular-artifacts"
+        },
+        "Description": "Build Valhalla for the gods",
+        "Environment": {
+          "Type": "LINUX_CONTAINER",
+          "ComputeType": "BUILD_GENERAL1_SMALL",
+          "Image": "aws/codebuild/standard:1.0"
+        },
+        "Name": "build-valhalla",
+        "ServiceRole": { "Ref": "IAmSpartacus" },
+        "Source": { "Type": "CODEPIPLINE" }
       }
     },
     "codepipeline": {
@@ -53,7 +114,7 @@
         "DisableInboundStageTransitions": [],
         "Name": "name",
         "RestartExecutionOnUpdate": false,
-        "RoleArn": "IAmSpartacus",
+        "RoleArn": { "Fn::GetAtt": ["IAmSpartacus", "Arn"] },
         "Stages": [
           {
             "Name": "Source",
@@ -65,17 +126,87 @@
                   "Version": "1",
                   "Provider": "GitHub"
                 },
-                "Configuration": { "key": "value" },
-                "InputArtifacts": [],
+                "Configuration": {
+                  "Owner": {
+                    "Ref": "GitHubOwner"
+                  },
+                  "Repo": {
+                    "Ref": "RepositoryName"
+                  },
+                  "Branch": {
+                    "Ref": "BranchName"
+                  },
+                  "OAuthToken": "{{resolve:secretsmanager:GithubWebHookSecret-ldiZrXPJlItz:SecretString:githubToken}}",
+                  "PollForSourceChanges": false
+                },
                 "Name": "actionName",
                 "OutputArtifacts": [],
-                "RoleArn": "",
+
                 "RunOrder": 1
+              }
+            ]
+          },
+          {
+            "Name": "Build",
+            "Actions": [
+              {
+                "ActionTypeId": {
+                  "Category": " Build",
+                  "Owner": "AWS",
+                  "Version": "1",
+                  "Provider": "CodeBuild"
+                },
+                "Configuration": {
+                  "ProjectName": "build-valhalla"
+                },
+                "InputArtifacts": [{ "name": "Source" }],
+                "Name": "build-magic",
+                "OutputArtifacts": [{ "name": "magicOut" }],
+                "RunOrder": 2
               }
             ]
           }
         ]
       }
+    },
+    "AppPipelineWebhook": {
+      "Type": "AWS::CodePipeline::Webhook",
+      "Properties": {
+        "Authentication": "GITHUB_HMAC",
+        "AuthenticationConfiguration": {
+          "SecretToken": "{{resolve:secretsmanager:GithubWebHookSecret-ldiZrXPJlItz:SecretString:githubToken}}"
+        },
+        "Filters": [
+          {
+            "JsonPath": "$.ref",
+            "MatchEquals": "refs/heads/{Branch}"
+          }
+        ],
+        "TargetPipeline": {
+          "Ref": "codepipeline"
+        },
+        "TargetAction": "SourceAction",
+        "Name": "AppPipelineWebhook",
+        "TargetPipelineVersion": {
+          "Fn::GetAtt": ["codepipeline", "Version"]
+        },
+        "RegisterWithThirdParty": true
+      }
+    }
+  },
+  "Parameters": {
+    "BranchName": {
+      "Description": "GitHub branch name",
+      "Type": "String",
+      "Default": "master"
+    },
+    "GitHubOwner": {
+      "Type": "String",
+      "Default": "stbth01"
+    },
+    "RepositoryName": {
+      "Type": "String",
+      "Default": "aws-angular-build-test"
     }
   }
 }
