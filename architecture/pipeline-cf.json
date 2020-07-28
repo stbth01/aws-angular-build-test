@@ -60,6 +60,13 @@
                 "Service": ["codepipeline.amazonaws.com"]
               },
               "Action": ["sts:AssumeRole"]
+            },
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": ["codebuild.amazonaws.com"]
+              },
+              "Action": ["sts:AssumeRole"]
             }
           ]
         },
@@ -100,10 +107,15 @@
           "Image": "aws/codebuild/standard:1.0"
         },
         "Name": "build-valhalla",
-        "ServiceRole": { "Ref": "IAmSpartacus" },
-        "Source": { "Type": "CODEPIPLINE" }
+        "ServiceRole": { "Fn::GetAtt": ["IAmSpartacus", "Arn"] },
+        "Source": {
+          "Location": "codebuild-demo-test/0123ab9a371ebf0187b0fe5614fbb72c",
+          "Type": "S3"
+        }
       }
-    },
+    }
+    
+    /// something below if barfing we think that codebuild is fine as it worked but we are still getting the "unsupported property name"
     "codepipeline": {
       "Type": "AWS::CodePipeline::Pipeline",
       "Properties": {
@@ -112,7 +124,7 @@
           "Location": { "Ref": "S3ArtifactBucket" }
         },
         "DisableInboundStageTransitions": [],
-        "Name": "name",
+        "Name": "BuildPipeline",
         "RestartExecutionOnUpdate": false,
         "RoleArn": { "Fn::GetAtt": ["IAmSpartacus", "Arn"] },
         "Stages": [
@@ -139,9 +151,8 @@
                   "OAuthToken": "{{resolve:secretsmanager:GithubWebHookSecret-ldiZrXPJlItz:SecretString:githubToken}}",
                   "PollForSourceChanges": false
                 },
-                "Name": "actionName",
-                "OutputArtifacts": [],
-
+                "Name": "sourceRepo",
+                "OutputArtifacts": [{ "name": "sourceRepoArtifacts" }],
                 "RunOrder": 1
               }
             ]
@@ -151,46 +162,23 @@
             "Actions": [
               {
                 "ActionTypeId": {
-                  "Category": " Build",
+                  "Category": "Build",
                   "Owner": "AWS",
                   "Version": "1",
-                  "Provider": "CodeBuild"
+                  "Provider": "AWS CodeBuild"
                 },
                 "Configuration": {
-                  "ProjectName": "build-valhalla"
+                  "ProjectName": "build-valhalla",
+                  "PrimarySource": "sourceRepoArtifacts"
                 },
-                "InputArtifacts": [{ "name": "Source" }],
+                "InputArtifacts": [{ "name": "sourceRepoArtifacts" }],
                 "Name": "build-magic",
                 "OutputArtifacts": [{ "name": "magicOut" }],
-                "RunOrder": 2
+                "RunOrder": 1
               }
             ]
           }
         ]
-      }
-    },
-    "AppPipelineWebhook": {
-      "Type": "AWS::CodePipeline::Webhook",
-      "Properties": {
-        "Authentication": "GITHUB_HMAC",
-        "AuthenticationConfiguration": {
-          "SecretToken": "{{resolve:secretsmanager:GithubWebHookSecret-ldiZrXPJlItz:SecretString:githubToken}}"
-        },
-        "Filters": [
-          {
-            "JsonPath": "$.ref",
-            "MatchEquals": "refs/heads/{Branch}"
-          }
-        ],
-        "TargetPipeline": {
-          "Ref": "codepipeline"
-        },
-        "TargetAction": "SourceAction",
-        "Name": "AppPipelineWebhook",
-        "TargetPipelineVersion": {
-          "Fn::GetAtt": ["codepipeline", "Version"]
-        },
-        "RegisterWithThirdParty": true
       }
     }
   },
