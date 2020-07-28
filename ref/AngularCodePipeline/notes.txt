@@ -1,0 +1,15 @@
+Highest- level events:
+1. PR_Opened
+    - Call Build Start
+2. PR_Approved
+    - Call Build Start
+3. PR_Branch_Updated
+    - Call Build Start
+4. Build_Start
+5. Build_End (regardless of outcome)
+    a. Passed
+    b. Failed  
+
+Notifications:
+<<All High Level Events>>
+PR_Comment_Added

@@ -1,0 +1,32 @@
+version: 0.2
+
+env:
+    variables:
+        ARTIFACT_FOLDER_NAME: 'test-cicd-artifacts'
+        DQ_ATLUS_API_STAGE: 'apidev'
+        DQ_ATLUS_OFFICIAL_STAGE_BRANCH: 'development'
+
+phases:
+    install:
+        #If you use the Ubuntu standard image 2.0 or later, you must specify runtime-versions.
+        #If you specify runtime-versions and use an image other than Ubuntu standard image 2.0, the build fails.
+        runtime-versions:
+            nodejs: 10
+            python: 3.7
+
+        commands:
+            - echo "Current Feature Build Environment"
+            - printenv | sort
+            - python --version
+            - node --version
+            - npm --version
+    build:
+        commands:
+            - echo "Starting Feature Build"
+            - echo timestart $CODEBUILD_START_TIME
+
+artifacts:
+    files: '**/*'
+    name: $ARTIFACT_FOLDER_NAME-$(date +%Y-%m-%d)-$CODEBUILD_START_TIME.zip
+    discard-paths: no
+    base-directory: test-reports

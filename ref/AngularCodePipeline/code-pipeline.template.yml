@@ -1,0 +1,269 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  BranchName:
+    Description: CodeCommit branch name
+    Type: String
+    Default: development
+  RepositoryName:
+    Description: CodeCommit repository name
+    Type: String
+    Default: myrepo
+  RepositoryARN:
+    Description: CodeCommit repository ARN
+    Type: String
+    Default: arn:aws:codecommit:us-east-1:800353127405:Test
+  LambdaBucket:
+    Description: Bucket with Lambda code in it
+    Type: String
+  NodeVersion:
+    Description: Version of Node.js to use during BUILD_GENERAL1_SMALL
+    Type: Number
+    MinValue: 12
+    MaxValue: 14
+    Default: 14
+
+Resources:
+  PipelineRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 'codecommit:GitPull'
+                Resource: !Ref RepositoryARN
+  RootInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Path: /
+      Roles:
+        - !Ref RootRole
+      
+
+  S3BucketArtifact:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+    DeletionPolicy: Retain
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      PolicyDocument:
+        Id: MyPolicy
+        Version: 2012-10-17
+        Statement:
+          - Sid: PublicReadForGetBucketObjects
+            Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
+            Resource: !Join
+              - ''
+              - - 'arn:aws:s3:::'
+                - !Ref S3BucketArtifact
+                - '/*'
+      Bucket: !Ref S3BucketArtifact
+
+  S3BucketDevApp:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+    DeletionPolicy: Retain
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      PolicyDocument:
+        Id: MyPolicy
+        Version: 2012-10-17
+        Statement:
+          - Sid: PublicReadForGetBucketObjects
+            Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
+            Resource: !Join
+              - ''
+              - - 'arn:aws:s3:::'
+                - !Ref S3BucketDevApp
+                - '/*'
+      Bucket: !Ref S3BucketDevApp
+
+  S3BucketDevStoryBook:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+    DeletionPolicy: Retain
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      PolicyDocument:
+        Id: MyPolicy
+        Version: 2012-10-17
+        Statement:
+          - Sid: PublicReadForGetBucketObjects
+            Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
+            Resource: !Join
+              - ''
+              - - 'arn:aws:s3:::'
+                - !Ref S3BucketDevStoryBook
+                - '/*'
+      Bucket: !Ref S3BucketDevStoryBook
+
+    
+  
+  PullRequestFunction:
+      Type: AWS::Lambda::Function
+      Properties:
+        Runtime: Python3.7
+        Role: arn:aws:iam::123456789012:role/lambda-role ### NEED to figure this out
+        Handler: pull_request.lambda_handler
+        Code:
+          S3Bucket: !Ref LambdaBucket
+          S3Key: 'LambdaFunctions.zip'
+        Description: 
+        TracingConfig:
+          Mode: Active
+
+  PullRequestEventRule:
+      Type: AWS::Events::Rule
+      Properties: 
+      Description: Start build anytime PR is created or updated
+        EventPattern: 	{
+                          "source": [
+                            "aws.codecommit"
+                          ],
+                          "detail-type": [
+                            "CodeCommit Repository State Change"
+                          ],
+                          "resources": [
+                            !Ref RepositoryARN ### NEED to figure this out
+                          ],
+                          "detail": {
+                            "event": [
+                              "referenceCreated",
+                              "referenceUpdated"
+                            ],
+                            "referenceType": [
+                              "branch"
+                            ],
+                            "referenceName": [
+                              !Ref BranchName ### NEED to figure this out
+                            ]
+                          }
+                        }
+        State: ENABLED
+        Targets: 
+          Arn: !Join [ '', [ 'arn:aws:codepipeline:', !Ref 'AWS::Region', ':', !Ref 'AWS::AccountId', ':', !Ref AppPipeline ] ]
+          RoleArn: !GetAtt AmazonCloudWatchEventRole.Arn
+          Id: codepipeline-AppPipeline
+
+
+
+  CBBuildCodeStage:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub 'BuildCode-${AWS::StackId}'
+      Description: "Build an Angular project"
+      Artifacts:
+        Type: no_artifacts
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: !Join
+          - ':'
+          - - node
+            - !Ref NodeVersion
+      Source:
+        Type: CODEPIPELINE
+
+
+  PRPipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Ref pPipelineName
+      RoleArn: !GetAtt
+        - CodePipelineServiceRole
+        - Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref pRegion
+      Stages: 
+        - 
+          Name: Source from CodeCommit
+          Actions:
+            -
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeCommit
+                Version: 1
+              Configuration:
+                BranchName: !Ref BranchName
+                RepositoryName: !Ref RepositoryName
+                PollForSourceChanges: false
+              OutputArtifacts:
+                - Name: SourceOuput
+              RunOrder: 1
+        -
+          Name: Build and Test
+          Actions:
+            -
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: 1
+              InputArtifacts:
+                - Name: SourceOutput
+              Configuration:
+                ProjectName:
+        -
+          Name: Deploy to S3
+          Actions:
+            - 
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: S3
+                Version: '1'
+              InputArtifacts:
+              
+          
+      RestartExecutionOnUpdate: true
+      DisableInboundStageTransitions:
+
+Outputs:
+  WebsiteURL:
+    Value: !GetAtt
+      - S3BucketArtifact
+      - WebsiteURL
+    Description: URL for websire hosted on S3
+  S3BucketSecureURL:
+    Value: !Join
+      - ''
+      - - 'https://'
+        - !GetAtt
+          - S3BucketArtifact
+          - DomainName
+    Description: Name of S3 bucket to hold website content

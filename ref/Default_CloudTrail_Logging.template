@@ -1,0 +1,178 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: 
+  Creates a single CloudTrail trail for the region in which it is deployed and an optional bucket for storing the trail. When you delete a stack with this template, only the trail is removed. Buckets and keys created by the stack remain if the stack is deleted. If you use an existing bucket, ensure that it has the requisite permissions for CloudTrail. It is recommended that the bucket parameter not be changed after creation.
+
+Parameters:
+  pKeyAdminGroup:
+    Type: String
+    Description: The fully qualified ARN of the group that can administer the keys
+    AllowedPattern: "arn:aws:iam::[0-9]+:group/.+"
+  pAllRegions:
+    Type: String
+    Description: Indicates if the CloudTrail trail should apply to all regions. If false, it will only apply to the region in which it is created. The default is false.
+    Default: False
+    AllowedValues:
+      - True
+      - False
+  pExistingBucket:
+    Type: String
+    Description: The name of an existing bucket as a destination for CloudTrail logs. If left blank, a bucket is created for you.
+    Default: ""
+  pIncludeS3Events:
+    Type: String
+    Description: Indicates if the trail should include S3 events.
+    Default: True
+    AllowedValues:
+      - True
+      - False
+  pIncludeGlobalServiceEvents:
+    Type: String
+    Description: Indicates if the trail should capture global service events (like IAM events). If pAllRegions is "True" then this will be ignored.
+    Default: False
+    AllowedValues:
+      - True
+      - False
+
+Conditions:
+  BucketExists: !Not [!Equals [!Ref pExistingBucket, ""]]
+  NeedNewBucket: !Equals [!Ref pExistingBucket, ""]
+  AllRegions: !Equals [!Ref pAllRegions, "True"]
+  IncludeS3Events: !Equals [!Ref pIncludeS3Events, "True"]
+  IncludeGlobalEvents: !Equals [!Ref pIncludeGlobalServiceEvents, "True"]
+
+Resources:
+  TrailKey:
+    Type: AWS::KMS::Key
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Description: A key for encrypting the trail logs, no matter where they are delivered. This exists in case the logs are delivered somewhere else than S3 in the future, e.g. CloudWatch.
+      Enabled: true
+      EnabledKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowFullAccessToAdministratorGroup
+            Effect: Allow
+            Principal: !Ref pKeyAdminGroup
+            Action: "kms:*"
+            Resource: "*"
+          - Sid: AllowUsageByCloudTrail
+            Effect: Allow
+            Principal: "cloudtrail.amazonaws.com"
+            Action: 
+              - "kms:Encrypt"
+              - "kms:Decrypt"
+              - "kms:ReEncrypt"
+              - "kms:GenerateDataKey*"
+              - "kms:DescribeKey"
+            Resource: "*"
+
+  GovernanceBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: NeedNewBucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Bucket: !Ref GovernanceBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Sid: "CloudTrailAclCheck"
+            Effect: "Allow"
+            Principal:
+              Service: "cloudtrail.amazonaws.com"
+            Action: "s3:GetObjectAcl"
+            Resource:
+              !Sub |-
+                "arn:aws:s3:::${GovernanceBucket}"
+          -
+            Sid: "CloudTrailWrite"
+            Effect: "Allow"
+            Principal:
+              Service: "cloudtrail.amazonaws.com"
+            Action: "s3:PutObject"
+            Resource: !If [AllRegions, !Sub "arn:aws:s3:::${GovernanceBucket}/global/AWSLogs/${AWS::AccountId}/*", !Sub "arn:aws:s3:::${GovernanceBucket}/${AWS::Region}/AWSLogs/${AWS:AccountId}/*"]
+            Condition:
+              StringEquals:
+                s3:x-amz-acl: "bucket-owner-full-control"
+          -
+            Sid: "DenyUnencryptedObjects"
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:PutObject"
+            Resource:
+              !Sub |-
+                "arn:aws:s3:::${GovernanceBucket}/*"
+            Condition:
+              StringNotEquals:
+                !Sub |-
+                  s3:x-amz-server-side-encryption: "aws:kms"
+          -
+            Sid: DenyDelete
+            Effect: Deny
+            Principal: "*"
+            Action:
+              - "s3:Delete*"
+            Resource:
+              - !Sub "arn:aws:s3:::${GovernanceBucket}"
+              - !Sub "arn:aws:s3:::${GovernanceBucket}/*"
+
+  GovernanceBucket:
+    Type: AWS::S3::Bucket
+    Condition: NeedNewBucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub "cloudtrail-${AWS::Region}-${AWS::AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  BucketPolicyWaitHandle:
+    Type: "AWS::CloudFormation::WaitConditionHandle"
+    Condition: NeedNewBucket
+    DependsOn: GovernanceBucketPolicy
+
+  DefaultWaitHandle:
+    Type: "AWS::CloudFormation::WaitConditionHandle"
+
+  BucketPolicyWaitCondition:
+    Type: "AWS::CloudFormation::WaitCondition"
+    Properties:
+      Handle: !If [NeedNewBucket, !Ref BucketPolicyWaitHandle, !Ref DefaultWaitHandle]
+      Timeout: "1"
+      Count: 0
+
+  GovernanceTrail:
+    Type: AWS::CloudTrail::Trail
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    DependsOn: BucketPolicyWaitCondition
+    Properties:
+      IncludeGlobalServiceEvents: !If
+        - AllRegions
+        - true
+        - !Ref IncludeGlobalEvents
+      EnableLogFileValidation: true
+      IsLogging: true
+      IsMultiRegionTrail: !Ref AllRegions
+      KMSKeyId: !Ref TrailKey
+      S3BucketName: !If [BucketExists, !Sub ${pExistingBucket}, !Ref GovernanceBucket]
+      S3KeyPrefix: !If [AllRegions, "global", !Ref AWS::Region]
+      EventSelectors: !If [IncludeS3Events, [{DataResources: [{Type: 'AWS::S3::Object', Values: ['arn:aws:s3:::']}], IncludeManagementEvents: true, ReadWriteType: All}], !Ref 'AWS::NoValue']
+
+Outputs:
+  StackName:
+    Description: AWS generated stack name
+    Value: !Sub ${AWS::StackName}
+  BucketName:
+    Description: Name of the bucket where logs will be sent. If using an existing bucket, this just echos the input parameter.
+    Value: !If [BucketExists, !Sub ${pExistingBucket}, !Ref GovernanceBucket]
+  TrailName:
+    Description: ARN of the trail.
+    Value: !GetAtt GovernanceTrail.Arn
