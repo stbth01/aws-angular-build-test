@@ -113,9 +113,7 @@
           "Type": "S3"
         }
       }
-    }
-    
-    /// something below if barfing we think that codebuild is fine as it worked but we are still getting the "unsupported property name"
+    },
     "codepipeline": {
       "Type": "AWS::CodePipeline::Pipeline",
       "Properties": {
@@ -152,7 +150,7 @@
                   "PollForSourceChanges": false
                 },
                 "Name": "sourceRepo",
-                "OutputArtifacts": [{ "name": "sourceRepoArtifacts" }],
+                "OutputArtifacts": [{ "Name": "sourceRepoArtifacts" }],
                 "RunOrder": 1
               }
             ]
@@ -165,15 +163,15 @@
                   "Category": "Build",
                   "Owner": "AWS",
                   "Version": "1",
-                  "Provider": "AWS CodeBuild"
+                  "Provider": "CodeBuild"
                 },
                 "Configuration": {
                   "ProjectName": "build-valhalla",
                   "PrimarySource": "sourceRepoArtifacts"
                 },
-                "InputArtifacts": [{ "name": "sourceRepoArtifacts" }],
+                "InputArtifacts": [{ "Name": "sourceRepoArtifacts" }],
                 "Name": "build-magic",
-                "OutputArtifacts": [{ "name": "magicOut" }],
+                "OutputArtifacts": [{ "Name": "magicOut" }],
                 "RunOrder": 1
               }
             ]
