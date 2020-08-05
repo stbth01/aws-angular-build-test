@@ -11,6 +11,43 @@
       "DeletionPolicy": "Delete"
     },
 
+    "s3DevSiteBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "AccessControl": "PublicRead",
+        "BucketName": "valhalla-12971829382",
+        "WebsiteConfiguration": {
+          "IndexDocument": "index.html",
+          "ErrorDocument": "index.html"
+        }
+      }
+    },
+
+    "s3DevSiteBucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": { "Ref": "s3DevSiteBucket" },
+        "PolicyDocument": {
+          "Id": "DevSite",
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "PublicReadForGetBucketObjects",
+              "Effect": "Allow",
+              "Principal": "*",
+              "Action": "s3:GetObject",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  ["arn:aws:s3:::", { "Ref": "s3DevSiteBucket" }, "/*"]
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+
     "getPutSourceBucket": {
       "Type": "AWS::IAM::Policy",
       "Properties": {
@@ -23,6 +60,12 @@
                 "Fn::Join": [
                   "",
                   ["arn:aws:s3:::", { "Ref": "S3ArtifactBucket" }, "/*"]
+                ]
+              },
+              {
+                "Fn::Join": [
+                  "",
+                  ["arn:aws:s3:::", { "Ref": "s3DevSiteBucket" }, "/*"]
                 ]
               }
             ],
@@ -136,7 +179,7 @@
                     ]
                   }
                 ],
-                "Action": ["codebuild:StartBuild"]
+                "Action": ["codebuild:StartBuild", "codebuild:BatchGetBuilds"]
               }
             }
           }
@@ -150,6 +193,15 @@
         "Artifacts": {
           "Type": "CODEPIPELINE"
         },
+        "SecondaryArtifacts": [
+          {
+            "ArtifactIdentifier": "dev_build",
+            "EncryptionDisabled": "True",
+            "Location": { "Ref": "s3DevSiteBucket" },
+            "Name": "/",
+            "Type": "S3"
+          }
+        ],
         "Description": "Build Valhalla for the gods",
         "Environment": {
           "Type": "LINUX_CONTAINER",
