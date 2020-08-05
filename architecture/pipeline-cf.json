@@ -97,8 +97,7 @@
       "Type": "AWS::CodeBuild::Project",
       "Properties": {
         "Artifacts": {
-          "Type": "S3",
-          "Location": "valhalla-aws-angular-artifacts"
+          "Type": "CODEPIPELINE"
         },
         "Description": "Build Valhalla for the gods",
         "Environment": {
@@ -109,8 +108,7 @@
         "Name": "build-valhalla",
         "ServiceRole": { "Fn::GetAtt": ["IAmSpartacus", "Arn"] },
         "Source": {
-          "Location": "codebuild-demo-test/0123ab9a371ebf0187b0fe5614fbb72c",
-          "Type": "S3"
+          "Type": "CODEPIPELINE"
         }
       }
     },
@@ -177,6 +175,30 @@
             ]
           }
         ]
+      }
+    },
+    "AppPipelineWebhook": {
+      "Type": "AWS::CodePipeline::Webhook",
+      "Properties": {
+        "Authentication": "GITHUB_HMAC",
+        "AuthenticationConfiguration": {
+          "SecretToken": "{{resolve:secretsmanager:GithubWebHookSecret-ldiZrXPJlItz:SecretString:githubToken}}"
+        },
+        "Filters": [
+          {
+            "JsonPath": "$.ref",
+            "MatchEquals": "refs/heads/{Branch}"
+          }
+        ],
+        "TargetPipeline": {
+          "Ref": "codepipeline"
+        },
+        "TargetAction": "sourceRepo",
+        "Name": "AppPipelineWebhook",
+        "TargetPipelineVersion": {
+          "Fn::GetAtt": ["codepipeline", "Version"]
+        },
+        "RegisterWithThirdParty": true
       }
     }
   },
