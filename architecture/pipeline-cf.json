@@ -10,6 +10,34 @@
       },
       "DeletionPolicy": "Delete"
     },
+
+    "getPutSourceBucket": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": {
+            "Effect": "Allow",
+            "Resource": [
+              {
+                "Fn::Join": [
+                  "",
+                  ["arn:aws:s3:::", { "Ref": "S3ArtifactBucket" }, "/*"]
+                ]
+              }
+            ],
+            "Action": ["s3:PutObject", "s3:GetObject"]
+          }
+        },
+
+        "PolicyName": "GetPutSourceBucket",
+        "Roles": [
+          { "Ref": "IAmSpartacusNowForCodeBuild" },
+          { "Ref": "IAmSpartacus" }
+        ]
+      }
+    },
+
     "IAmSpartacusNowForCodeBuild": {
       "Type": "AWS::IAM::Role",
       "Properties": {
@@ -50,6 +78,22 @@
                 "Action": ["s3:PutObject", "s3:GetObject"]
               }
             }
+          },
+          {
+            "PolicyName": "logStreams",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": {
+                "Effect": "Allow",
+                "Resource": "*",
+                "Action": [
+                  "logs:CreateLogStream",
+                  "logs:GetLogEvents",
+                  "logs:CreateLogGroup",
+                  "logs:PutLogEvents"
+                ]
+              }
+            }
           }
         ],
         "RoleName": "MathRole-WhateverIWantNowForCodeBuild"
@@ -72,24 +116,6 @@
         },
         "Policies": [
           {
-            "PolicyName": "root",
-            "PolicyDocument": {
-              "Version": "2012-10-17",
-              "Statement": {
-                "Effect": "Allow",
-                "Resource": [
-                  {
-                    "Fn::Join": [
-                      "",
-                      ["arn:aws:s3:::", { "Ref": "S3ArtifactBucket" }, "/*"]
-                    ]
-                  }
-                ],
-                "Action": ["s3:PutObject", "s3:GetObject"]
-              }
-            }
-          },
-          {
             "PolicyName": "startBuild",
             "PolicyDocument": {
               "Version": "2012-10-17",
@@ -110,7 +136,7 @@
                     ]
                   }
                 ],
-                "Action": ["s3:PutObject", "s3:GetObject"]
+                "Action": ["codebuild:StartBuild"]
               }
             }
           }
