@@ -46,3 +46,4 @@ testem.log
 Thumbs.db
 
 ref/
+test-results.xml
