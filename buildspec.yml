@@ -12,6 +12,10 @@ reports:
   UnitTestReports:
     files:
       - "test-results.xml"
+  CoverageTestReports:
+    files:
+      - "covertura-coverage.xml"
+    base-directory: "coverage/valhalla"
 artifacts:
   files:
     - "**/*"
