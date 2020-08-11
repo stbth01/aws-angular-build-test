@@ -9,10 +9,7 @@ phases:
       - npm run build
       - npm run test:ci
 reports:
-  UnitTestReports:
-    files:
-      - "test-results.xml"
-  CoverageTestReports:
+  CoverageTestReports2:
     files:
       - "cobertura-coverage.xml"
     base-directory: "coverage/valhalla"
