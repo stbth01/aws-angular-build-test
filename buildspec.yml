@@ -16,6 +16,7 @@ reports:
     files:
       - "cobertura-coverage.xml"
     base-directory: "coverage/valhalla"
+    file-format: "CoberturaXml"
 artifacts:
   files:
     - "**/*"
