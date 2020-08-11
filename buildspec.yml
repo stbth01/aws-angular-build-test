@@ -14,7 +14,7 @@ reports:
       - "test-results.xml"
   CoverageTestReports:
     files:
-      - "covertura-coverage.xml"
+      - "cobertura-coverage.xml"
     base-directory: "coverage/valhalla"
 artifacts:
   files:
