@@ -1,0 +1,22 @@
+{
+  "name": "build-scripts",
+  "version": "1.0.0",
+  "description": "aws build scripts",
+  "main": "code-pipeline-kick.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "tfs and github shhhhh"
+  },
+  "keywords": [
+    "magic",
+    "valhalla"
+  ],
+  "author": "A-a-Ron",
+  "license": "ISC",
+  "dependencies": {
+    "aws-sdk": "^2.736.0"
+  }
+}
