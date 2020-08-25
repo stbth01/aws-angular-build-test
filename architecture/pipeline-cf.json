@@ -217,6 +217,20 @@
             "Location": { "Ref": "s3DevSiteBucket" },
             "Name": "/",
             "Type": "S3"
+          },
+          {
+            "ArtifactIdentifier": "unit_test",
+            "EncryptionDisabled": "True",
+            "Location": { "Ref": "S3ArtifactBucket" },
+            "Type": "S3",
+            "Name": "unit_test"
+          },
+          {
+            "ArtifactIdentifier": "coverage",
+            "EncryptionDisabled": "True",
+            "Location": { "Ref": "S3ArtifactBucket" },
+            "Type": "S3",
+            "Name": "coverage"
           }
         ],
         "Description": "Build Valhalla for the gods",
