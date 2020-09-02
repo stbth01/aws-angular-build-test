@@ -1,0 +1,384 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "",
+  "Resources": {
+    "S3ArtifactBucketPR": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": { "Fn::Join": ["", [{ "Ref": "ArtifactBucketName" }, "-pr"]] }
+      },
+      "DeletionPolicy": "Delete"
+    },
+    "S3ArtifactBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": { "Ref": "ArtifactBucketName" }
+      },
+      "DeletionPolicy": "Delete"
+    },
+
+    "s3DevSiteBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": { "Ref": "DevSiteBucketName" },
+        "WebsiteConfiguration": {
+          "IndexDocument": "index.html",
+          "ErrorDocument": "index.html"
+        }
+      }
+    },
+    "s3PRSiteBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": { "Fn::Join": ["", [{ "Ref": "DevSiteBucketName" }, "-pr"]] },
+        "WebsiteConfiguration": {
+          "IndexDocument": "index.html",
+          "ErrorDocument": "index.html"
+        }
+      }
+    },
+    "s3DevSiteBucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": { "Ref": "s3DevSiteBucket" },
+        "PolicyDocument": {
+          "Id": "DevSite",
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "PublicReadForGetBucketObjects",
+              "Effect": "Allow",
+              "Principal": "*",
+              "Action": "s3:GetObject",
+              "Resource": {
+                "Fn::Join": ["", ["arn:aws:s3:::", { "Ref": "s3DevSiteBucket" }, "/*"]]
+              }
+            }
+          ]
+        }
+      }
+    },
+
+    "getPutSourceBucket": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": {
+            "Effect": "Allow",
+            "Resource": [
+              {
+                "Fn::Join": ["", ["arn:aws:s3:::", { "Ref": "S3ArtifactBucket" }, "/*"]]
+              },
+              {
+                "Fn::Join": ["", ["arn:aws:s3:::", { "Ref": "s3DevSiteBucket" }, "/*"]]
+              }
+            ],
+            "Action": ["s3:PutObject", "s3:GetObject"]
+          }
+        },
+
+        "PolicyName": "GetPutSourceBucket",
+        "Roles": [{ "Ref": "IAmSpartacusNowForCodeBuild" }, { "Ref": "IAmSpartacus" }]
+      }
+    },
+
+    "IAmSpartacusNowForCodeBuild": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": ["codepipeline.amazonaws.com"]
+              },
+              "Action": ["sts:AssumeRole"]
+            },
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": ["codebuild.amazonaws.com"]
+              },
+              "Action": ["sts:AssumeRole"]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "root",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": {
+                "Effect": "Allow",
+                "Resource": [
+                  {
+                    "Fn::Join": ["", ["arn:aws:s3:::", { "Ref": "S3ArtifactBucket" }, "/*"]]
+                  }
+                ],
+                "Action": ["s3:PutObject", "s3:GetObject"]
+              }
+            }
+          },
+          {
+            "PolicyName": "logStreams",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": {
+                "Effect": "Allow",
+                "Resource": "*",
+                "Action": ["logs:CreateLogStream", "logs:GetLogEvents", "logs:CreateLogGroup", "logs:PutLogEvents"]
+              }
+            }
+          }
+        ],
+        "RoleName": "MathRole-Covid-CodeBuild"
+      }
+    },
+    "IAmSpartacus": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": ["codepipeline.amazonaws.com"]
+              },
+              "Action": ["sts:AssumeRole"]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "startBuild",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": {
+                "Effect": "Allow",
+                "Resource": [
+                  {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:aws:codebuild:",
+                        { "Ref": "AWS::Region" },
+                        ":",
+                        { "Ref": "AWS::AccountId" },
+                        ":project/",
+                        { "Ref": "codebuild" }
+                      ]
+                    ]
+                  }
+                ],
+                "Action": ["codebuild:StartBuild", "codebuild:BatchGetBuilds"]
+              }
+            }
+          }
+        ],
+        "RoleName": "MathRole-Covid"
+      }
+    },
+
+    "codebuildPR": {
+      "Type": "AWS::CodeBuild::Project",
+      "Properties": {
+        "Artifacts": {
+          "EncryptionDisabled": "True",
+          "Location": { "Ref": "S3ArtifactBucketPR" },
+          "Name": "/",
+          "Type": "S3"
+        },
+        "SecondaryArtifacts": [
+          {
+            "ArtifactIdentifier": "dev_build",
+            "EncryptionDisabled": "True",
+            "Location": { "Ref": "s3PRSiteBucket" },
+            "Name": "/",
+            "Type": "S3"
+          }
+        ],
+        "Description": "COVID PR Build",
+        "Environment": {
+          "Type": "LINUX_CONTAINER",
+          "ComputeType": "BUILD_GENERAL1_SMALL",
+          "Image": "aws/codebuild/standard:1.0"
+        },
+        "Name": { "Fn::Join": ["", [ { "Ref": "RepositoryName" }, "pr-build" ]] },
+        "ServiceRole": { "Fn::GetAtt": ["IAmSpartacusNowForCodeBuild", "Arn"] },
+        "Source": {
+          "Type": "GITHUB",
+          "Auth": {
+            "Resource": "{{resolve:secretsmanager:GithubWebHookSecret-ldiZrXPJlItz:SecretString:githubToken",
+            "Type": "OAUTH"
+          },
+          "Location": { "Fn::Join": ["/", ["https://github.com", { "Ref": "GitHubOwner" }, { "Ref": "RepositoryName" } ]] },
+          "ReportBuildStatus": true
+        },
+        "Triggers": {
+          "Webhook": true,
+          "FilterGroups": [
+            [
+              {
+                "Type": "EVENT",
+                "Pattern": "PULL_REQUEST_CREATED,PULL_REQUEST_UPDATED"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "codebuild": {
+      "Type": "AWS::CodeBuild::Project",
+      "Properties": {
+        "Artifacts": {
+          "Type": "CODEPIPELINE"
+        },
+        "SecondaryArtifacts": [
+          {
+            "ArtifactIdentifier": "dev_build",
+            "EncryptionDisabled": "True",
+            "Location": { "Ref": "s3DevSiteBucket" },
+            "Name": "/",
+            "Type": "S3"
+          }
+        ],
+        "Description": "Build Valhalla for the gods",
+        "Environment": {
+          "Type": "LINUX_CONTAINER",
+          "ComputeType": "BUILD_GENERAL1_SMALL",
+          "Image": "aws/codebuild/standard:1.0"
+        },
+        "Name": { "Fn::Join": ["", ["build-", {"Ref": "RepositoryName"}]]},
+        "ServiceRole": { "Fn::GetAtt": ["IAmSpartacusNowForCodeBuild", "Arn"] },
+        "Source": {
+          "Type": "CODEPIPELINE"
+        }
+      }
+    },
+    "codepipeline": {
+      "Type": "AWS::CodePipeline::Pipeline",
+      "Properties": {
+        "ArtifactStore": {
+          "Type": "S3",
+          "Location": { "Ref": "S3ArtifactBucket" }
+        },
+        "DisableInboundStageTransitions": [],
+        "Name": "BuildPipeline",
+        "RestartExecutionOnUpdate": false,
+        "RoleArn": { "Fn::GetAtt": ["IAmSpartacus", "Arn"] },
+        "Stages": [
+          {
+            "Name": "Source",
+            "Actions": [
+              {
+                "ActionTypeId": {
+                  "Category": "Source",
+                  "Owner": "ThirdParty",
+                  "Version": "1",
+                  "Provider": "GitHub"
+                },
+                "Configuration": {
+                  "Owner": {
+                    "Ref": "GitHubOwner"
+                  },
+                  "Repo": {
+                    "Ref": "RepositoryName"
+                  },
+                  "Branch": {
+                    "Ref": "BranchName"
+                  },
+                  "OAuthToken": "{{resolve:secretsmanager:GithubWebHookSecret-ldiZrXPJlItz:SecretString:githubToken",
+                  "PollForSourceChanges": false
+                },
+                "Name": "sourceRepo",
+                "OutputArtifacts": [{ "Name": "sourceRepoArtifacts" }],
+                "RunOrder": 1
+              }
+            ]
+          },
+          {
+            "Name": "Build",
+            "Actions": [
+              {
+                "ActionTypeId": {
+                  "Category": "Build",
+                  "Owner": "AWS",
+                  "Version": "1",
+                  "Provider": "CodeBuild"
+                },
+                "Configuration": {
+                  "ProjectName": "build-valhalla",
+                  "PrimarySource": "sourceRepoArtifacts"
+                },
+                "InputArtifacts": [{ "Name": "sourceRepoArtifacts" }],
+                
+                "Name": { "Fn::Join": ["", ["dev-build-", {"Ref": "RepositoryName"}]]},
+                "OutputArtifacts": [{ "Name": "magicOut" }],
+                "RunOrder": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "AppPipelineWebhook": {
+      "Type": "AWS::CodePipeline::Webhook",
+      "Properties": {
+        "Authentication": "GITHUB_HMAC",
+        "AuthenticationConfiguration": {
+          "SecretToken": "{{resolve:secretsmanager:GithubWebHookSecret-ldiZrXPJlItz:SecretString:githubToken"
+        },
+        "Filters": [
+          {
+            "JsonPath": "$.ref",
+            "MatchEquals": "refs/heads/{Branch}"
+          }
+        ],
+        "TargetPipeline": {
+          "Ref": "codepipeline"
+        },
+        "TargetAction": "sourceRepo",
+        "Name": { "Fn::Join": ["", [ {"Ref": "RepositoryName"}, "PipelineWebhook"]]},
+        "TargetPipelineVersion": {
+          "Fn::GetAtt": ["codepipeline", "Version"]
+        },
+        "RegisterWithThirdParty": true
+      }
+    }
+  },
+  "Parameters": {
+    "BranchName": {
+      "Description": "GitHub branch name",
+      "Type": "String",
+      "Default": "master"
+    },
+    "ArtifactBucketName": {
+      "Description": "s3 bucket for build artifacts",
+      "Type": "String",
+      "Default": "github-orgs-build-artifacts-3535"
+    },
+    "DevSiteBucketName": {
+      "Description": "s3 bucket for Dev Build site",
+      "Type": "String",
+      "Default": "github-orgs-dev-3454"
+    },
+    "GitHubOwner": {
+      "Type": "String",
+      "Description": "This is the account that the repo lives in",
+      "Default": "mardinc"
+    },
+    "RepositoryName": {
+      "Type": "String",
+      "Description": "This is just teh name of the repo",
+      "Default": "test-ci"
+    },
+    "SecretKey": {
+      "Type": "String",
+      "Description": "This is just teh name of the repo",
+      "Default": "GithubWebHookSecret-ldiZrXPJlItz"
+    }
+  }
+}
