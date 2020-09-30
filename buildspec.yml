@@ -13,9 +13,7 @@ phases:
       - ls
       - cd ..
       - ls
-      - cd ..
-      - ls
-      - cd ..
+      - cd app
       - ls
       - npm run lint
       - npm run build
