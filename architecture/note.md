@@ -24,7 +24,7 @@
                 --template-body file://pipeline-cf.json \
                 --profile 800353127405_SandboxAdministrator --region us-east-1
 
-                aws cloudformation create-stack \
+                aws cloudformation update-stack \
                 --stack-name valhalla-pipeline \
                 --template-body file://pipeline-cf.json \
                 --capabilities CAPABILITY_NAMED_IAM \
