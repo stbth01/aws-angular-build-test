@@ -4,8 +4,7 @@ phases:
   build:
     commands:
       - echo timestart $CODEBUILD_START_TIME
-      - cp -r /app/node_modules .
-      - ls
+      - npm install
       - npm run lint
       - npm run build &
       - npm run test:ci
