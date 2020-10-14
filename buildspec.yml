@@ -1,12 +1,14 @@
 version: 0.2
 
 phases:
+  install:
+    commands:
+      - npm install
   build:
     commands:
       - echo timestart $CODEBUILD_START_TIME
-      - npm install
       - npm run lint
-      - npm run build &
+      - npm run build
       - npm run test:ci
 reports:
   UnitTestReportsAgain:
