@@ -35,7 +35,7 @@
                 --template-body file://pipeline-cf.json \
                 --capabilities CAPABILITY_NAMED_IAM \
                 --profile 800353127405_SandboxAdministrator --region us-east-1
-
+aa
         aws cloudformation validate-template \
                 --template-body file://secrets.json \
                 --profile 800353127405_SandboxAdministrator --region us-east-1
