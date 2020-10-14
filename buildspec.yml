@@ -35,3 +35,6 @@ artifacts:
       files:
         - "cobertura-coverage.xml"
       base-directory: "coverage/valhalla"
+cache:
+  paths:
+    - 'node_modules/**/*'

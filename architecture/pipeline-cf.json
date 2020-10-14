@@ -207,6 +207,10 @@
     "codebuild": {
       "Type": "AWS::CodeBuild::Project",
       "Properties": {
+        "Cache": {
+          "Type": "LOCAL",
+          "Modes": ["LOCAL_CUSTOM_CACHE"]
+        },
         "Artifacts": {
           "Type": "CODEPIPELINE"
         },
