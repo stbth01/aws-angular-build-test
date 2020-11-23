@@ -5,7 +5,9 @@
     "S3ArtifactBucketPR": {
       "Type": "AWS::S3::Bucket",
       "Properties": {
-        "BucketName": { "Fn::Join": ["", [{ "Ref": "ArtifactBucketName" }, "-pr"]] }
+        "BucketName": {
+          "Fn::Join": ["", [{ "Ref": "ArtifactBucketName" }, "-pr"]]
+        }
       },
       "DeletionPolicy": "Delete"
     },
@@ -30,7 +32,9 @@
     "s3PRSiteBucket": {
       "Type": "AWS::S3::Bucket",
       "Properties": {
-        "BucketName": { "Fn::Join": ["", [{ "Ref": "DevSiteBucketName" }, "-pr"]] },
+        "BucketName": {
+          "Fn::Join": ["", [{ "Ref": "DevSiteBucketName" }, "-pr"]]
+        },
         "WebsiteConfiguration": {
           "IndexDocument": "index.html",
           "ErrorDocument": "index.html"
@@ -51,7 +55,10 @@
               "Principal": "*",
               "Action": "s3:GetObject",
               "Resource": {
-                "Fn::Join": ["", ["arn:aws:s3:::", { "Ref": "s3DevSiteBucket" }, "/*"]]
+                "Fn::Join": [
+                  "",
+                  ["arn:aws:s3:::", { "Ref": "s3DevSiteBucket" }, "/*"]
+                ]
               }
             }
           ]
@@ -68,10 +75,16 @@
             "Effect": "Allow",
             "Resource": [
               {
-                "Fn::Join": ["", ["arn:aws:s3:::", { "Ref": "S3ArtifactBucket" }, "/*"]]
+                "Fn::Join": [
+                  "",
+                  ["arn:aws:s3:::", { "Ref": "S3ArtifactBucket" }, "/*"]
+                ]
               },
               {
-                "Fn::Join": ["", ["arn:aws:s3:::", { "Ref": "s3DevSiteBucket" }, "/*"]]
+                "Fn::Join": [
+                  "",
+                  ["arn:aws:s3:::", { "Ref": "s3DevSiteBucket" }, "/*"]
+                ]
               }
             ],
             "Action": ["s3:PutObject", "s3:GetObject"]
@@ -79,7 +92,10 @@
         },
 
         "PolicyName": "GetPutSourceBucket",
-        "Roles": [{ "Ref": "IAmSpartacusNowForCodeBuild" }, { "Ref": "IAmSpartacus" }]
+        "Roles": [
+          { "Ref": "IAmSpartacusNowForCodeBuild" },
+          { "Ref": "IAmSpartacus" }
+        ]
       }
     },
 
@@ -114,7 +130,10 @@
                 "Effect": "Allow",
                 "Resource": [
                   {
-                    "Fn::Join": ["", ["arn:aws:s3:::", { "Ref": "S3ArtifactBucket" }, "/*"]]
+                    "Fn::Join": [
+                      "",
+                      ["arn:aws:s3:::", { "Ref": "S3ArtifactBucket" }, "/*"]
+                    ]
                   }
                 ],
                 "Action": ["s3:PutObject", "s3:GetObject"]
@@ -128,7 +147,12 @@
               "Statement": {
                 "Effect": "Allow",
                 "Resource": "*",
-                "Action": ["logs:CreateLogStream", "logs:GetLogEvents", "logs:CreateLogGroup", "logs:PutLogEvents"]
+                "Action": [
+                  "logs:CreateLogStream",
+                  "logs:GetLogEvents",
+                  "logs:CreateLogGroup",
+                  "logs:PutLogEvents"
+                ]
               }
             }
           }
@@ -206,15 +230,30 @@
           "ComputeType": "BUILD_GENERAL1_SMALL",
           "Image": "aws/codebuild/standard:1.0"
         },
-        "Name": { "Fn::Join": ["", [ { "Ref": "RepositoryName" }, "pr-build" ]] },
+
+        "Name": {
+          "Fn::Join": [
+            "",
+            [{ "Ref": "AppName" }, { "Ref": "RepositoryName" }, "pr-build"]
+          ]
+        },
         "ServiceRole": { "Fn::GetAtt": ["IAmSpartacusNowForCodeBuild", "Arn"] },
         "Source": {
           "Type": "GITHUB",
           "Auth": {
-            "Resource": "{{resolve:secretsmanager:GithubWebHookSecret-ldiZrXPJlItz:SecretString:githubToken",
+            "Resource": "{{resolve:secretsmanager:GithubWebHookSecret-ldiZrXPJlItz:SecretString:githubToken}}",
             "Type": "OAUTH"
           },
-          "Location": { "Fn::Join": ["/", ["https://github.com", { "Ref": "GitHubOwner" }, { "Ref": "RepositoryName" } ]] },
+          "Location": {
+            "Fn::Join": [
+              "/",
+              [
+                "https://github.com",
+                { "Ref": "GitHubOwner" },
+                { "Ref": "RepositoryName" }
+              ]
+            ]
+          },
           "ReportBuildStatus": true
         },
         "Triggers": {
@@ -251,7 +290,12 @@
           "ComputeType": "BUILD_GENERAL1_SMALL",
           "Image": "aws/codebuild/standard:1.0"
         },
-        "Name": { "Fn::Join": ["", ["build-", {"Ref": "RepositoryName"}]]},
+        "Name": {
+          "Fn::Join": [
+            "-",
+            [{ "Ref": "AppName" }, "build", { "Ref": "RepositoryName" }]
+          ]
+        },
         "ServiceRole": { "Fn::GetAtt": ["IAmSpartacusNowForCodeBuild", "Arn"] },
         "Source": {
           "Type": "CODEPIPELINE"
@@ -310,12 +354,23 @@
                   "Provider": "CodeBuild"
                 },
                 "Configuration": {
-                  "ProjectName": "build-valhalla",
+                  "ProjectName": {
+                    "Fn::Join": [
+                      "-",
+                      [
+                        { "Ref": "AppName" },
+                        "build",
+                        { "Ref": "RepositoryName" }
+                      ]
+                    ]
+                  },
                   "PrimarySource": "sourceRepoArtifacts"
                 },
                 "InputArtifacts": [{ "Name": "sourceRepoArtifacts" }],
-                
-                "Name": { "Fn::Join": ["", ["dev-build-", {"Ref": "RepositoryName"}]]},
+
+                "Name": {
+                  "Fn::Join": ["", ["dev-build-", { "Ref": "RepositoryName" }]]
+                },
                 "OutputArtifacts": [{ "Name": "magicOut" }],
                 "RunOrder": 1
               }
@@ -341,7 +396,9 @@
           "Ref": "codepipeline"
         },
         "TargetAction": "sourceRepo",
-        "Name": { "Fn::Join": ["", [ {"Ref": "RepositoryName"}, "PipelineWebhook"]]},
+        "Name": {
+          "Fn::Join": ["", [{ "Ref": "RepositoryName" }, "PipelineWebhook"]]
+        },
         "TargetPipelineVersion": {
           "Fn::GetAtt": ["codepipeline", "Version"]
         },
@@ -353,32 +410,37 @@
     "BranchName": {
       "Description": "GitHub branch name",
       "Type": "String",
-      "Default": "master"
+      "Default": "development"
     },
     "ArtifactBucketName": {
       "Description": "s3 bucket for build artifacts",
       "Type": "String",
-      "Default": "github-orgs-build-artifacts-3535"
+      "Default": "github-math-orgs-build-artifacts"
     },
     "DevSiteBucketName": {
       "Description": "s3 bucket for Dev Build site",
       "Type": "String",
-      "Default": "github-orgs-dev-3454"
+      "Default": "github-math-orgs-dev"
     },
     "GitHubOwner": {
       "Type": "String",
       "Description": "This is the account that the repo lives in",
-      "Default": "mardinc"
+      "Default": "stbth01"
     },
     "RepositoryName": {
       "Type": "String",
       "Description": "This is just teh name of the repo",
-      "Default": "test-ci"
+      "Default": "aws-angular-build-test"
     },
     "SecretKey": {
       "Type": "String",
       "Description": "This is just teh name of the repo",
       "Default": "GithubWebHookSecret-ldiZrXPJlItz"
+    },
+    "AppName": {
+      "Type": "String",
+      "Description": "This is just teh name of the repo",
+      "Default": "Math-Org"
     }
   }
 }
