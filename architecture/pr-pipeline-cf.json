@@ -2,17 +2,10 @@
   "AWSTemplateFormatVersion": "2010-09-09",
   "Description": "",
   "Resources": {
-    "S3ArtifactBucketPR": {
-      "Type": "AWS::S3::Bucket",
-      "Properties": {
-        "BucketName": { "Fn::Join": ["", [{ "Ref": "ArtifactBucketName" }, "-pr"]] }
-      },
-      "DeletionPolicy": "Delete"
-    },
     "S3ArtifactBucket": {
       "Type": "AWS::S3::Bucket",
       "Properties": {
-        "BucketName": { "Ref": "ArtifactBucketName" }
+        "BucketName": "artifact-bucket-valhalla-12971829382"
       },
       "DeletionPolicy": "Delete"
     },
@@ -20,17 +13,18 @@
     "s3DevSiteBucket": {
       "Type": "AWS::S3::Bucket",
       "Properties": {
-        "BucketName": { "Ref": "DevSiteBucketName" },
+        "BucketName": "valhalla-12971829382",
         "WebsiteConfiguration": {
           "IndexDocument": "index.html",
           "ErrorDocument": "index.html"
         }
       }
     },
-    "s3PRSiteBucket": {
+    "s3TestSiteBucket": {
       "Type": "AWS::S3::Bucket",
       "Properties": {
-        "BucketName": { "Fn::Join": ["", [{ "Ref": "DevSiteBucketName" }, "-pr"]] },
+        "AccessControl": "Private",
+        "BucketName": "valhalla-test-12971829382",
         "WebsiteConfiguration": {
           "IndexDocument": "index.html",
           "ErrorDocument": "index.html"
@@ -51,7 +45,34 @@
               "Principal": "*",
               "Action": "s3:GetObject",
               "Resource": {
-                "Fn::Join": ["", ["arn:aws:s3:::", { "Ref": "s3DevSiteBucket" }, "/*"]]
+                "Fn::Join": [
+                  "",
+                  ["arn:aws:s3:::", { "Ref": "s3DevSiteBucket" }, "/*"]
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    "s3TestSiteBucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": { "Ref": "s3TestSiteBucket" },
+        "PolicyDocument": {
+          "Id": "DevSite",
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "PublicReadForGetBucketObjects",
+              "Effect": "Allow",
+              "Principal": "*",
+              "Action": "s3:GetObject",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  ["arn:aws:s3:::", { "Ref": "s3TestSiteBucket" }, "/*"]
+                ]
               }
             }
           ]
@@ -68,10 +89,22 @@
             "Effect": "Allow",
             "Resource": [
               {
-                "Fn::Join": ["", ["arn:aws:s3:::", { "Ref": "S3ArtifactBucket" }, "/*"]]
+                "Fn::Join": [
+                  "",
+                  ["arn:aws:s3:::", { "Ref": "S3ArtifactBucket" }, "/*"]
+                ]
               },
               {
-                "Fn::Join": ["", ["arn:aws:s3:::", { "Ref": "s3DevSiteBucket" }, "/*"]]
+                "Fn::Join": [
+                  "",
+                  ["arn:aws:s3:::", { "Ref": "s3TestSiteBucket" }, "/*"]
+                ]
+              },
+              {
+                "Fn::Join": [
+                  "",
+                  ["arn:aws:s3:::", { "Ref": "s3DevSiteBucket" }, "/*"]
+                ]
               }
             ],
             "Action": ["s3:PutObject", "s3:GetObject"]
@@ -79,10 +112,29 @@
         },
 
         "PolicyName": "GetPutSourceBucket",
-        "Roles": [{ "Ref": "IAmSpartacusNowForCodeBuild" }, { "Ref": "IAmSpartacus" }]
+        "Roles": [
+          { "Ref": "IAmSpartacusNowForCodeBuild" },
+          { "Ref": "IAmSpartacus" }
+        ]
       }
     },
-
+    "SNSTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "DisplayName": "Display Name for SNS Topic",
+        "Subscription": [
+          {
+            "Endpoint": "bhunscher@mathematica-mpr.com",
+            "Protocol": "email"
+          },
+          {
+            "Endpoint": "amarden@mathematica-mpr.com",
+            "Protocol": "email"
+          }
+        ],
+        "TopicName": "ApprovalTopic"
+      }
+    },
     "IAmSpartacusNowForCodeBuild": {
       "Type": "AWS::IAM::Role",
       "Properties": {
@@ -114,7 +166,10 @@
                 "Effect": "Allow",
                 "Resource": [
                   {
-                    "Fn::Join": ["", ["arn:aws:s3:::", { "Ref": "S3ArtifactBucket" }, "/*"]]
+                    "Fn::Join": [
+                      "",
+                      ["arn:aws:s3:::valhalla-aws-angular-artifacts/*"]
+                    ]
                   }
                 ],
                 "Action": ["s3:PutObject", "s3:GetObject"]
@@ -128,12 +183,34 @@
               "Statement": {
                 "Effect": "Allow",
                 "Resource": "*",
-                "Action": ["logs:CreateLogStream", "logs:GetLogEvents", "logs:CreateLogGroup", "logs:PutLogEvents"]
+                "Action": [
+                  "logs:CreateLogStream",
+                  "logs:GetLogEvents",
+                  "logs:CreateLogGroup",
+                  "logs:PutLogEvents"
+                ]
+              }
+            }
+          },
+          {
+            "PolicyName": "Reporter",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": {
+                "Effect": "Allow",
+                "Resource": "*",
+                "Action": [
+                  "codebuild:CreateReportGroup",
+                  "codebuild:CreateReport",
+                  "codebuild:UpdateReport",
+                  "codebuild:BatchPutTestCases",
+                  "codebuild:BatchPutCodeCoverages"
+                ]
               }
             }
           }
         ],
-        "RoleName": "MathRole-Covid-CodeBuild"
+        "RoleName": "MathRole-WhateverIWantNowForCodeBuild"
       }
     },
     "IAmSpartacus": {
@@ -178,56 +255,7 @@
             }
           }
         ],
-        "RoleName": "MathRole-Covid"
-      }
-    },
-
-    "codebuildPR": {
-      "Type": "AWS::CodeBuild::Project",
-      "Properties": {
-        "Artifacts": {
-          "EncryptionDisabled": "True",
-          "Location": { "Ref": "S3ArtifactBucketPR" },
-          "Name": "/",
-          "Type": "S3"
-        },
-        "SecondaryArtifacts": [
-          {
-            "ArtifactIdentifier": "dev_build",
-            "EncryptionDisabled": "True",
-            "Location": { "Ref": "s3PRSiteBucket" },
-            "Name": "/",
-            "Type": "S3"
-          }
-        ],
-        "Description": "COVID PR Build",
-        "Environment": {
-          "Type": "LINUX_CONTAINER",
-          "ComputeType": "BUILD_GENERAL1_SMALL",
-          "Image": "aws/codebuild/standard:1.0"
-        },
-        "Name": { "Fn::Join": ["", [ { "Ref": "RepositoryName" }, "pr-build" ]] },
-        "ServiceRole": { "Fn::GetAtt": ["IAmSpartacusNowForCodeBuild", "Arn"] },
-        "Source": {
-          "Type": "GITHUB",
-          "Auth": {
-            "Resource": "{{resolve:secretsmanager:GithubWebHookSecret-ldiZrXPJlItz:SecretString:githubToken",
-            "Type": "OAUTH"
-          },
-          "Location": { "Fn::Join": ["/", ["https://github.com", { "Ref": "GitHubOwner" }, { "Ref": "RepositoryName" } ]] },
-          "ReportBuildStatus": true
-        },
-        "Triggers": {
-          "Webhook": true,
-          "FilterGroups": [
-            [
-              {
-                "Type": "EVENT",
-                "Pattern": "PULL_REQUEST_CREATED,PULL_REQUEST_UPDATED"
-              }
-            ]
-          ]
-        }
+        "RoleName": "MathRole-WhateverIWant"
       }
     },
     "codebuild": {
@@ -243,15 +271,29 @@
             "Location": { "Ref": "s3DevSiteBucket" },
             "Name": "/",
             "Type": "S3"
+          },
+          {
+            "ArtifactIdentifier": "unit_test",
+            "EncryptionDisabled": "True",
+            "Location": { "Ref": "S3ArtifactBucket" },
+            "Type": "S3",
+            "Name": "unit_test"
+          },
+          {
+            "ArtifactIdentifier": "coverage",
+            "EncryptionDisabled": "True",
+            "Location": { "Ref": "S3ArtifactBucket" },
+            "Type": "S3",
+            "Name": "coverage"
           }
         ],
         "Description": "Build Valhalla for the gods",
         "Environment": {
           "Type": "LINUX_CONTAINER",
           "ComputeType": "BUILD_GENERAL1_SMALL",
-          "Image": "aws/codebuild/standard:1.0"
+          "Image": "aws/codebuild/standard:5.0"
         },
-        "Name": { "Fn::Join": ["", ["build-", {"Ref": "RepositoryName"}]]},
+        "Name": "build-valhalla",
         "ServiceRole": { "Fn::GetAtt": ["IAmSpartacusNowForCodeBuild", "Arn"] },
         "Source": {
           "Type": "CODEPIPELINE"
@@ -290,7 +332,7 @@
                   "Branch": {
                     "Ref": "BranchName"
                   },
-                  "OAuthToken": "{{resolve:secretsmanager:GithubWebHookSecret-ldiZrXPJlItz:SecretString:githubToken",
+                  "OAuthToken": "{{resolve:secretsmanager:GithubWebHookSecret-ldiZrXPJlItz:SecretString:githubToken}}",
                   "PollForSourceChanges": false
                 },
                 "Name": "sourceRepo",
@@ -314,10 +356,46 @@
                   "PrimarySource": "sourceRepoArtifacts"
                 },
                 "InputArtifacts": [{ "Name": "sourceRepoArtifacts" }],
-                
-                "Name": { "Fn::Join": ["", ["dev-build-", {"Ref": "RepositoryName"}]]},
+                "Name": "build-magic",
                 "OutputArtifacts": [{ "Name": "magicOut" }],
+                "RunOrder": 2
+              }
+            ]
+          },
+          {
+            "Name": "DeployTest",
+            "Actions": [
+              {
+                "ActionTypeId": {
+                  "Category": "Approval",
+                  "Owner": "AWS",
+                  "Version": "1",
+                  "Provider": "Manual"
+                },
+                "Name": {
+                  "Fn::Join": [
+                    "",
+                    ["dev-build-approval-", { "Ref": "RepositoryName" }]
+                  ]
+                },
                 "RunOrder": 1
+              },
+              {
+                "ActionTypeId": {
+                  "Category": "Deploy",
+                  "Owner": "AWS",
+                  "Version": "1",
+                  "Provider": "S3"
+                },
+                "InputArtifacts": [{ "Name": "magicOut" }],
+                "Configuration": {
+                  "BucketName": { "Ref": "s3TestSiteBucket" },
+                  "Extract": "true"
+                },
+                "Name": {
+                  "Fn::Join": ["", ["dev-deploy-", { "Ref": "RepositoryName" }]]
+                },
+                "RunOrder": 2
               }
             ]
           }
@@ -329,7 +407,7 @@
       "Properties": {
         "Authentication": "GITHUB_HMAC",
         "AuthenticationConfiguration": {
-          "SecretToken": "{{resolve:secretsmanager:GithubWebHookSecret-ldiZrXPJlItz:SecretString:githubToken"
+          "SecretToken": "{{resolve:secretsmanager:GithubWebHookSecret-ldiZrXPJlItz:SecretString:githubToken}}"
         },
         "Filters": [
           {
@@ -341,7 +419,7 @@
           "Ref": "codepipeline"
         },
         "TargetAction": "sourceRepo",
-        "Name": { "Fn::Join": ["", [ {"Ref": "RepositoryName"}, "PipelineWebhook"]]},
+        "Name": "AppPipelineWebhook",
         "TargetPipelineVersion": {
           "Fn::GetAtt": ["codepipeline", "Version"]
         },
@@ -355,30 +433,13 @@
       "Type": "String",
       "Default": "master"
     },
-    "ArtifactBucketName": {
-      "Description": "s3 bucket for build artifacts",
-      "Type": "String",
-      "Default": "github-orgs-build-artifacts-3535"
-    },
-    "DevSiteBucketName": {
-      "Description": "s3 bucket for Dev Build site",
-      "Type": "String",
-      "Default": "github-orgs-dev-3454"
-    },
     "GitHubOwner": {
       "Type": "String",
-      "Description": "This is the account that the repo lives in",
-      "Default": "mardinc"
+      "Default": "stbth01"
     },
     "RepositoryName": {
       "Type": "String",
-      "Description": "This is just teh name of the repo",
-      "Default": "test-ci"
-    },
-    "SecretKey": {
-      "Type": "String",
-      "Description": "This is just teh name of the repo",
-      "Default": "GithubWebHookSecret-ldiZrXPJlItz"
+      "Default": "aws-angular-build-test"
     }
   }
 }
