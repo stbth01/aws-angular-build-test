@@ -1,11 +1,13 @@
 version: 0.2
 
 phases:
+  # install:
+  #   commands:
+  #     - npm install
   build:
     commands:
       - echo timestart $CODEBUILD_START_TIME
-      - ls
-      # - npm ci
+      - npm install
       - npm run lint
       - npm run build
       - npm run test:ci
@@ -35,3 +37,6 @@ artifacts:
       files:
         - "cobertura-coverage.xml"
       base-directory: "coverage/valhalla"
+cache:
+  paths:
+    - "node_modules/**/*"
